@@ -1,0 +1,61 @@
+# ============================================
+# NETWORK ANOMALY DETECTION - YOUR PROJECT
+# ============================================
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# ---------- Virtual Environment ----------
+venv/
+ENV/
+env/
+
+# ---------- IDE & Editors ----------
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.ipynb_checkpoints/
+*.swp
+*.swo
+*~
+
+# ---------- OS Files ----------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ---------- Project Specific ----------
+# Keep ONLY the sample dummy data
+data/processed/network_ml_ready.csv  # Generated file
+data/raw/dummy_network_raw - dummy_network_raw.csv.csv  # Duplicate file
+
+# Keep these:
+# data/raw/dummy_network_raw.csv  # Your sample data
+# data/raw/README.md (if exists)
+# data/processed/README.md (if exists)
+
+# ---------- Output & Generated Files ----------
+*.log
+*.pdf
+*.docx
+*.png
+*.jpg
+*.jpeg
+
+# ---------- Temporary Files ----------
+*.tmp
+*.temp
+.cache/
+temp/
+tmp/
