@@ -15,7 +15,7 @@
 
 ### Limitations ###
 
-#### As being said, This is made to express what Ive learn in data analyst and networking. It also limitations since it is a small personal project. For its technical limits, file size (100 mb for csv and 50MB for PCAP). The system provides full support for TCP, UDP, and ICMP protocols. However, it offers limited analysis capabilities for encrypted traffic due to inherent constraints in inspecting encrypted payloads.For processing PCAP files, the system requires installation of the Scapy library. This dependency enables comprehensive packet analysis from captured network traffic files. Several detection limitations should be noted. False positives may occur where normal traffic patterns are flagged as anomalous in certain edge cases or unusual network configurations. Additionally, the system may not detect completely novel attack patterns without prior training or pattern recognition. Encrypted traffic presents another constraint, offering limited insight into packet contents due to encryption. Furthermore, the system lacks organizational context awareness and does not incorporate specific network policies that might influence threat assessment. The system supports Windows, Mac, and Linux platforms with Python 3.8 or higher. Minimum specifications include 4GB of RAM and 2GB of free disk space. For optimal performance, especially when working with larger datasets, 8GB or more of RAM is recommended to ensure efficient processing and analysis. ####
+#### As being said, This is made to express what I've learn in data analyst and networking. It also limitations since it is a small personal project. For its technical limits, file size (100 mb for csv and 50MB for PCAP). The system provides full support for TCP, UDP, and ICMP protocols. However, it offers limited analysis capabilities for encrypted traffic due to inherent constraints in inspecting encrypted payloads.For processing PCAP files, the system requires installation of the Scapy library. This dependency enables comprehensive packet analysis from captured network traffic files. Several detection limitations should be noted. False positives may occur where normal traffic patterns are flagged as anomalous in certain edge cases or unusual network configurations. Additionally, the system may not detect completely novel attack patterns without prior training or pattern recognition. Encrypted traffic presents another constraint, offering limited insight into packet contents due to encryption. Furthermore, the system lacks organizational context awareness and does not incorporate specific network policies that might influence threat assessment. The system supports Windows, Mac, and Linux platforms with Python 3.8 or higher. Minimum specifications include 4GB of RAM and 2GB of free disk space. For optimal performance, especially when working with larger datasets, 8GB or more of RAM is recommended to ensure efficient processing and analysis. ####
 
 ### How it work? ###
 
@@ -63,6 +63,7 @@
 
 
 ##### Disclaimer: The data that I used is data from wireshark.
+
 
 
 
