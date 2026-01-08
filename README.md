@@ -53,7 +53,7 @@
 #### Details
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/00bce63e-8f56-493a-acd8-ba601262a5dc" />
 
-##### As you can see there is option for generating report, that is save as html but its look like.
+##### As you can see there is option for generating report and save as html file.
 
 
 
@@ -63,6 +63,7 @@
 
 
 ##### Disclaimer: The data that I used is data from wireshark.
+
 
 
 
