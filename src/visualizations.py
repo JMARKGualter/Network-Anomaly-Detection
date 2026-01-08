@@ -3,11 +3,18 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
+import matplotlib.animation as animation
+from matplotlib.animation import FuncAnimation
+import warnings
+
+warnings.filterwarnings('ignore')
 
 # Set style
-plt.style.use('seaborn-v0_8-whitegrid')
+plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
+
+# ============== STATIC PLOTS ==============
 
 def create_time_series_plot(df):
     """Create time series visualization of network data"""
@@ -296,3 +303,239 @@ def create_heatmap(df):
     ax.set_title('Feature Correlation Heatmap')
     fig.tight_layout()
     return fig
+
+
+# ============== ANIMATED PLOTS ==============
+
+def create_animated_time_series(df, ax):
+    """Create animated time series plot - returns animation function"""
+    if 'timestamp' not in df.columns:
+        # Create dummy time if none exists
+        df = df.reset_index()
+        df['timestamp'] = df.index
+
+    # Sort by time
+    df = df.sort_values('timestamp')
+
+    # Get first numeric column
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) == 0:
+        return None
+
+    y_col = numeric_cols[0]
+
+    # Create line for animation
+    line, = ax.plot([], [], lw=3, color='#4361ee', alpha=0.8)
+    point, = ax.plot([], [], 'o', color='#f72585', markersize=10)
+
+    # Set up plot
+    ax.set_xlim(df['timestamp'].min(), df['timestamp'].max())
+    ax.set_ylim(df[y_col].min() * 0.9, df[y_col].max() * 1.1)
+    ax.set_xlabel('Time')
+    ax.set_ylabel(y_col)
+    ax.set_title('Network Traffic Over Time (Animated)')
+    ax.grid(True, alpha=0.3)
+
+    def animate(i):
+        """Animation function"""
+        if i < len(df):
+            x_data = df['timestamp'].iloc[:i + 1]
+            y_data = df[y_col].iloc[:i + 1]
+            line.set_data(x_data, y_data)
+            point.set_data([df['timestamp'].iloc[i]], [df[y_col].iloc[i]])
+
+        return line, point
+
+    return animate
+
+
+def create_animated_scatter(df, ax):
+    """Create animated scatter plot showing anomalies - returns animation function"""
+    if 'anomaly' not in df.columns:
+        return None
+
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    numeric_cols = [col for col in numeric_cols if col not in ['anomaly', 'anomaly_score']]
+
+    if len(numeric_cols) < 2:
+        return None
+
+    x_col, y_col = numeric_cols[:2]
+
+    # Create scatter plots
+    normal_scatter = ax.scatter([], [], alpha=0.6, s=20, label='Normal',
+                                color='#4361ee', animated=True)
+    anomaly_scatter = ax.scatter([], [], alpha=0.9, s=50, label='Anomaly',
+                                 color='#f72585', edgecolors='black',
+                                 linewidth=1.5, animated=True)
+
+    # Set limits
+    ax.set_xlim(df[x_col].min() * 0.9, df[x_col].max() * 1.1)
+    ax.set_ylim(df[y_col].min() * 0.9, df[y_col].max() * 1.1)
+    ax.set_xlabel(x_col)
+    ax.set_ylabel(y_col)
+    ax.set_title('Anomaly Detection (Animated)')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+
+    def animate(i):
+        """Animation function"""
+        # Show more points over time
+        step = max(1, len(df) // 50)
+        idx = min(i * step, len(df))
+
+        df_partial = df.iloc[:idx]
+        normal_partial = df_partial[df_partial['anomaly'] == 0]
+        anomaly_partial = df_partial[df_partial['anomaly'] == 1]
+
+        if len(normal_partial) > 0:
+            normal_scatter.set_offsets(np.c_[normal_partial[x_col], normal_partial[y_col]])
+
+        if len(anomaly_partial) > 0:
+            anomaly_scatter.set_offsets(np.c_[anomaly_partial[x_col], anomaly_partial[y_col]])
+
+        # Update title with progress
+        ax.set_title(f'Anomaly Detection ({idx}/{len(df)} points)')
+
+        return normal_scatter, anomaly_scatter
+
+    return animate
+
+
+def create_pulsing_heatmap(df, ax):
+    """Create heatmap with pulsing animation - returns animation function"""
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+
+    if len(numeric_cols) < 2:
+        return None
+
+    # Calculate correlation matrix
+    corr_matrix = df[numeric_cols].corr()
+
+    # Initial heatmap
+    im = ax.imshow(corr_matrix, cmap='coolwarm', aspect='auto',
+                   vmin=-1, vmax=1, animated=True)
+
+    # Add colorbar
+    cbar = plt.colorbar(im, ax=ax)
+    cbar.set_label('Correlation')
+
+    # Set ticks
+    ax.set_xticks(range(len(numeric_cols)))
+    ax.set_yticks(range(len(numeric_cols)))
+    ax.set_xticklabels(numeric_cols, rotation=45, ha='right')
+    ax.set_yticklabels(numeric_cols)
+    ax.set_title('Feature Correlation Heatmap')
+
+    def animate(i):
+        """Pulsing animation"""
+        # Create pulsing effect by modulating vmin/vmax
+        pulse = 0.1 * np.sin(i * 0.1)  # Gentle pulse
+        im.set_clim(vmin=-1 + pulse, vmax=1 - pulse)
+
+        # Add correlation values with fade effect
+        for text in ax.texts:
+            text.remove()
+
+        alpha = 0.5 + 0.5 * abs(np.sin(i * 0.1))  # Fading effect
+        for i_idx in range(len(numeric_cols)):
+            for j_idx in range(len(numeric_cols)):
+                value = corr_matrix.iloc[i_idx, j_idx]
+                color = 'white' if abs(value) > 0.5 else 'black'
+                ax.text(j_idx, i_idx, f'{value:.2f}',
+                        ha='center', va='center',
+                        color=color, alpha=alpha,
+                        fontsize=8, fontweight='bold')
+
+        return im,
+
+    return animate
+
+
+def create_protocol_bar_animation(df, ax):
+    """Animated bar chart for protocol distribution - returns animation function"""
+    protocol_cols = [col for col in df.columns
+                     if any(keyword in col.lower()
+                            for keyword in ['proto', 'protocol', 'type'])]
+
+    if not protocol_cols:
+        return None
+
+    protocol_col = protocol_cols[0]
+    protocol_counts = df[protocol_col].value_counts().head(8)
+
+    # Create bars
+    bars = ax.bar(range(len(protocol_counts)), [0] * len(protocol_counts),
+                  color='#4361ee', alpha=0.7, edgecolor='black')
+
+    # Set up plot
+    ax.set_xlabel('Protocol')
+    ax.set_ylabel('Count')
+    ax.set_title('Protocol Distribution (Loading...)')
+    ax.set_xticks(range(len(protocol_counts)))
+    ax.set_xticklabels(protocol_counts.index, rotation=45, ha='right')
+    ax.grid(True, alpha=0.3, axis='y')
+
+    def animate(i):
+        """Growing bars animation"""
+        for idx, bar in enumerate(bars):
+            target_height = protocol_counts.iloc[idx]
+            current_height = bar.get_height()
+
+            # Smooth growth
+            if current_height < target_height:
+                new_height = current_height + target_height * 0.05
+                bar.set_height(min(new_height, target_height))
+
+            # Add value labels at the end
+            if i > 40:  # Show labels after animation
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width() / 2., height,
+                        f'{int(height):,}', ha='center', va='bottom',
+                        fontsize=9, fontweight='bold')
+
+        # Update title
+        progress = min(i / 50, 1.0)
+        ax.set_title(f'Protocol Distribution ({progress * 100:.0f}% loaded)')
+
+        return bars
+
+    return animate
+
+
+def create_loading_animation(ax):
+    """Create a loading animation for empty states - returns animation function"""
+    # Create rotating dots
+    dots = []
+    colors = ['#4361ee', '#4cc9f0', '#7209b7', '#f72585', '#3a0ca3']
+
+    for i in range(5):
+        dot, = ax.plot([], [], 'o', color=colors[i], markersize=15,
+                       alpha=0.7, animated=True)
+        dots.append(dot)
+
+    ax.set_xlim(-1.5, 1.5)
+    ax.set_ylim(-1.5, 1.5)
+    ax.axis('off')
+    ax.set_title('Loading Analysis...', fontsize=14, pad=20)
+
+    def animate(i):
+        """Rotating dots animation"""
+        angle = i * 0.1
+        radius = 1.0
+
+        for idx, dot in enumerate(dots):
+            offset = idx * (2 * np.pi / 5)
+            x = radius * np.cos(angle + offset)
+            y = radius * np.sin(angle + offset)
+            dot.set_data([x], [y])
+
+        # Add pulsing effect
+        for idx, dot in enumerate(dots):
+            pulse = 0.3 * abs(np.sin(angle + idx * 0.5)) + 0.7
+            dot.set_alpha(pulse)
+            dot.set_markersize(15 * pulse)
+
+        return dots
+
+    return animate

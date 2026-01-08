@@ -11,6 +11,11 @@ import json
 import os
 import sys
 
+# Set matplotlib to use TkAgg backend explicitly
+import matplotlib
+
+matplotlib.use('TkAgg')
+
 # Import project modules
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from data_loader import load_and_validate_csv
@@ -23,16 +28,22 @@ from visualizations import (
     create_heatmap,
     create_arp_analysis
 )
-from report_generator import generate_report
 
-# ---------- THEME ----------
-BG_COLOR = "#f8f9fa"  # Light gray background
-PANEL_COLOR = "#ffffff"  # White panels
-ACCENT_COLOR = "#4361ee"  # Blue accent
-WARNING_COLOR = "#f72585"  # Pink for anomalies
-SUCCESS_COLOR = "#4cc9f0"  # Cyan for success
-TEXT_COLOR = "#2b2d42"  # Dark text
-BORDER_COLOR = "#dee2e6"  # Light border
+# Import the theme manager
+try:
+    from theme_manager import ThemeManager
+
+    THEME_MANAGER_AVAILABLE = True
+except ImportError:
+    THEME_MANAGER_AVAILABLE = False
+
+# Import enhanced report generator
+try:
+    from report_generator import ReportGenerator
+
+    REPORT_GEN_AVAILABLE = True
+except ImportError:
+    REPORT_GEN_AVAILABLE = False
 
 
 class NetworkAnomalyDashboard:
@@ -40,45 +51,99 @@ class NetworkAnomalyDashboard:
         self.root = root
         self.root.title("Network Anomaly Detection System")
         self.root.geometry("1400x900")
-        self.root.configure(bg=BG_COLOR)
 
         # Application state
         self.data = None
         self.anomaly_results = None
         self.current_view = "overview"
+        self.current_theme = "dark"  # Default theme
+
+        # Initialize theme manager if available
+        if THEME_MANAGER_AVAILABLE:
+            self.theme_manager = ThemeManager(self.root)
+            self.current_theme = self.theme_manager.current_theme['name']
 
         # Initialize UI
         self.setup_styles()
         self.create_main_layout()
 
+        # Set initial theme
+        self.apply_theme()
+
     def setup_styles(self):
-        """Configure ttk styles"""
+        """Configure ttk styles based on theme"""
         style = ttk.Style()
         style.theme_use('clam')
 
-        # Configure colors
+        # Configure colors based on theme
+        if self.current_theme == "dark":
+            self.bg_color = "#0f172a"
+            self.panel_color = "#1e293b"
+            self.accent_color = "#3b82f6"
+            self.warning_color = "#ef4444"
+            self.success_color = "#10b981"
+            self.text_color = "#e5e7eb"
+            self.border_color = "#475569"
+        else:  # light theme
+            self.bg_color = "#f8fafc"
+            self.panel_color = "#ffffff"
+            self.accent_color = "#2563eb"
+            self.warning_color = "#dc2626"
+            self.success_color = "#059669"
+            self.text_color = "#1e293b"
+            self.border_color = "#e2e8f0"
+
+        # Configure root window
+        self.root.configure(bg=self.bg_color)
+
+        # Configure styles
         style.configure('Title.TLabel',
-                        background=BG_COLOR,
-                        foreground=TEXT_COLOR,
+                        background=self.bg_color,
+                        foreground=self.text_color,
                         font=('Segoe UI', 16, 'bold'))
 
         style.configure('Panel.TFrame',
-                        background=PANEL_COLOR,
+                        background=self.panel_color,
                         relief='solid',
                         borderwidth=1)
 
         style.configure('Accent.TButton',
-                        background=ACCENT_COLOR,
+                        background=self.accent_color,
                         foreground='white',
                         font=('Segoe UI', 10),
                         borderwidth=0)
 
         style.map('Accent.TButton',
-                  background=[('active', '#3a56d4')])
+                  background=[('active', self._lighten_color(self.accent_color, 20))])
 
         style.configure('Warning.TButton',
-                        background=WARNING_COLOR,
+                        background=self.warning_color,
                         foreground='white')
+
+        style.configure('Success.TButton',
+                        background=self.success_color,
+                        foreground='white')
+
+        # Configure entry and combobox
+        style.configure('TEntry',
+                        fieldbackground=self.panel_color if self.current_theme == "light" else "#334155",
+                        foreground=self.text_color)
+
+        style.configure('TCombobox',
+                        fieldbackground=self.panel_color if self.current_theme == "light" else "#334155",
+                        foreground=self.text_color)
+
+    def _lighten_color(self, color, percent):
+        """Lighten a color by percent"""
+        # Convert hex to RGB
+        color = color.lstrip('#')
+        rgb = tuple(int(color[i:i + 2], 16) for i in (0, 2, 4))
+
+        # Lighten
+        light_rgb = tuple(min(255, int(c * (1 + percent / 100))) for c in rgb)
+
+        # Convert back to hex
+        return '#{:02x}{:02x}{:02x}'.format(*light_rgb)
 
     def create_main_layout(self):
         """Create the main dashboard layout"""
@@ -91,10 +156,20 @@ class NetworkAnomalyDashboard:
                   text="🔍 Network Anomaly Detection System",
                   style='Title.TLabel').pack(side='left', padx=10)
 
+        # Theme toggle button
+        if THEME_MANAGER_AVAILABLE:
+            theme_text = "☀️ Light" if self.current_theme == "dark" else "🌙 Dark"
+            self.theme_btn = ttk.Button(header_frame,
+                                        text=theme_text,
+                                        command=self.toggle_theme,
+                                        style='Success.TButton',
+                                        width=10)
+            self.theme_btn.pack(side='right', padx=(0, 10))
+
         # Status label
         self.status_label = ttk.Label(header_frame,
                                       text="Ready to analyze network data",
-                                      foreground='#6c757d')
+                                      foreground=self.text_color)
         self.status_label.pack(side='right', padx=10)
 
         # Main container (sidebar + content)
@@ -111,63 +186,109 @@ class NetworkAnomalyDashboard:
         # Initial empty state
         self.show_welcome_screen()
 
+    def toggle_theme(self):
+        """Toggle between dark and light themes"""
+        if THEME_MANAGER_AVAILABLE:
+            self.theme_manager.switch_theme()
+            self.current_theme = self.theme_manager.current_theme['name']
+            self.setup_styles()
+            self.apply_theme()
+
+            # Update theme button text
+            theme_text = "☀️ Light" if self.current_theme == "dark" else "🌙 Dark"
+            self.theme_btn.configure(text=theme_text)
+
+            # Re-apply theme to all widgets
+            if hasattr(self, 'widget_dict'):
+                self.theme_manager.apply_theme(self.widget_dict)
+
+            # Refresh current view
+            if self.current_view:
+                self.switch_view(self.current_view)
+
+    def apply_theme(self):
+        """Apply theme colors to root window"""
+        self.root.configure(bg=self.bg_color)
+
     def create_sidebar(self, parent):
         """Create the sidebar with navigation"""
-        sidebar = ttk.Frame(parent, width=250, style='Panel.TFrame')
+        sidebar = ttk.Frame(parent, width=280, style='Panel.TFrame')
         sidebar.pack(side='left', fill='y')
         sidebar.pack_propagate(False)
+
+        # Store widgets for theme management
+        self.widget_dict = {
+            'frame': [sidebar],
+            'label': [],
+            'button': [],
+            'entry': [],
+            'text': [],
+            'canvas': []
+        }
 
         # Upload section
         upload_frame = ttk.Frame(sidebar)
         upload_frame.pack(fill='x', padx=15, pady=15)
+        self.widget_dict['frame'].append(upload_frame)
 
-        ttk.Label(upload_frame,
-                  text="DATA SOURCE",
-                  font=('Segoe UI', 10, 'bold')).pack(anchor='w')
+        upload_label = ttk.Label(upload_frame,
+                                 text="📁 DATA SOURCE",
+                                 font=('Segoe UI', 10, 'bold'),
+                                 foreground=self.accent_color)
+        upload_label.pack(anchor='w')
+        self.widget_dict['label'].append(upload_label)
 
         self.upload_btn = ttk.Button(upload_frame,
-                                     text="📁 Upload CSV/PCAP",
+                                     text="Upload CSV/PCAP",
                                      command=self.upload_data,
                                      style='Accent.TButton')
         self.upload_btn.pack(fill='x', pady=5)
+        self.widget_dict['button'].append(self.upload_btn)
 
         self.data_info_label = ttk.Label(upload_frame,
                                          text="No data loaded",
                                          font=('Segoe UI', 9),
-                                         foreground='#6c757d')
+                                         foreground=self._lighten_color(self.text_color, -30))
         self.data_info_label.pack(anchor='w')
+        self.widget_dict['label'].append(self.data_info_label)
 
         # Separator
         ttk.Separator(sidebar, orient='horizontal').pack(fill='x', padx=15, pady=10)
 
-        # Analysis sections (initially disabled)
-        self.analysis_frame = ttk.Frame(sidebar)
-        self.analysis_frame.pack(fill='x', padx=15, pady=5)
+        # Analysis sections
+        analysis_frame = ttk.Frame(sidebar)
+        analysis_frame.pack(fill='x', padx=15, pady=5)
+        self.widget_dict['frame'].append(analysis_frame)
 
-        ttk.Label(self.analysis_frame,
-                  text="ANALYSIS VIEWS",
-                  font=('Segoe UI', 10, 'bold')).pack(anchor='w')
+        analysis_label = ttk.Label(analysis_frame,
+                                   text="📊 ANALYSIS VIEWS",
+                                   font=('Segoe UI', 10, 'bold'),
+                                   foreground=self.accent_color)
+        analysis_label.pack(anchor='w')
+        self.widget_dict['label'].append(analysis_label)
 
         # View buttons
         views = [
-            ("📊 Overview", "overview"),
+            ("📈 Overview", "overview"),
             ("⏰ Time Series", "time_series"),
-            ("📈 Distributions", "distributions"),
+            ("📊 Distributions", "distributions"),
             ("🎯 Anomaly Detection", "anomaly_detection"),
-            ("🔢 Protocol Analysis", "protocols"),
+            ("🔢 Protocols", "protocols"),
             ("🌐 ARP Analysis", "arp"),
             ("🔥 Heatmap", "heatmap"),
-            ("📋 Detailed View", "detailed")
+            ("📋 Details", "detailed")
         ]
 
         self.view_buttons = {}
         for text, view_key in views:
-            btn = ttk.Button(self.analysis_frame,
+            btn = ttk.Button(analysis_frame,
                              text=text,
-                             command=lambda v=view_key: self.switch_view(v))
+                             command=lambda v=view_key: self.switch_view(v),
+                             style='TButton')
             btn.pack(fill='x', pady=2)
             btn.state(['disabled'])
             self.view_buttons[view_key] = btn
+            self.widget_dict['button'].append(btn)
 
         # Separator
         ttk.Separator(sidebar, orient='horizontal').pack(fill='x', padx=15, pady=10)
@@ -175,32 +296,44 @@ class NetworkAnomalyDashboard:
         # Actions section
         actions_frame = ttk.Frame(sidebar)
         actions_frame.pack(fill='x', padx=15, pady=5)
+        self.widget_dict['frame'].append(actions_frame)
 
-        ttk.Label(actions_frame,
-                  text="ACTIONS",
-                  font=('Segoe UI', 10, 'bold')).pack(anchor='w')
+        actions_label = ttk.Label(actions_frame,
+                                  text="⚡ ACTIONS",
+                                  font=('Segoe UI', 10, 'bold'),
+                                  foreground=self.accent_color)
+        actions_label.pack(anchor='w')
+        self.widget_dict['label'].append(actions_label)
 
         # Action buttons
         self.detect_btn = ttk.Button(actions_frame,
-                                     text="🚨 Run Anomaly Detection",
+                                     text="🚨 Detect Anomalies",
                                      command=self.run_anomaly_detection,
                                      style='Warning.TButton')
         self.detect_btn.pack(fill='x', pady=2)
         self.detect_btn.state(['disabled'])
+        self.widget_dict['button'].append(self.detect_btn)
 
         self.export_btn = ttk.Button(actions_frame,
-                                     text="💾 Export Report",
+                                     text="📄 Generate Report",
                                      command=self.export_report)
         self.export_btn.pack(fill='x', pady=2)
         self.export_btn.state(['disabled'])
+        self.widget_dict['button'].append(self.export_btn)
 
         # Model selection
-        ttk.Label(actions_frame,
-                  text="Detection Model:",
-                  font=('Segoe UI', 9)).pack(anchor='w', pady=(10, 0))
+        model_frame = ttk.Frame(actions_frame)
+        model_frame.pack(fill='x', pady=(10, 0))
+        self.widget_dict['frame'].append(model_frame)
+
+        model_label = ttk.Label(model_frame,
+                                text="🤖 Detection Model:",
+                                font=('Segoe UI', 9))
+        model_label.pack(anchor='w')
+        self.widget_dict['label'].append(model_label)
 
         self.model_var = tk.StringVar(value="Isolation Forest")
-        model_combo = ttk.Combobox(actions_frame,
+        model_combo = ttk.Combobox(model_frame,
                                    textvariable=self.model_var,
                                    values=["Isolation Forest",
                                            "Local Outlier Factor",
@@ -210,6 +343,7 @@ class NetworkAnomalyDashboard:
                                    state="readonly",
                                    width=20)
         model_combo.pack(fill='x', pady=2)
+        self.widget_dict['entry'].append(model_combo)
 
     def show_welcome_screen(self):
         """Show initial welcome/upload screen"""
@@ -218,58 +352,86 @@ class NetworkAnomalyDashboard:
 
         welcome_frame = ttk.Frame(self.content_frame)
         welcome_frame.pack(expand=True, fill='both', padx=50, pady=50)
+        self.widget_dict['frame'].append(welcome_frame)
 
         # Welcome text
-        ttk.Label(welcome_frame,
-                  text="Welcome to Network Anomaly Detection",
-                  font=('Segoe UI', 24, 'bold'),
-                  foreground=TEXT_COLOR).pack(pady=20)
+        title_label = ttk.Label(welcome_frame,
+                                text="Network Anomaly Detection System",
+                                font=('Segoe UI', 28, 'bold'),
+                                foreground=self.accent_color)
+        title_label.pack(pady=20)
+        self.widget_dict['label'].append(title_label)
 
-        ttk.Label(welcome_frame,
-                  text="Upload network traffic data to begin analysis",
-                  font=('Segoe UI', 14),
-                  foreground='#6c757d').pack(pady=10)
+        subtitle_label = ttk.Label(welcome_frame,
+                                   text="AI-Powered Network Security & Monitoring",
+                                   font=('Segoe UI', 14),
+                                   foreground=self._lighten_color(self.text_color, -20))
+        subtitle_label.pack(pady=5)
+        self.widget_dict['label'].append(subtitle_label)
 
         # Upload card
         upload_card = ttk.Frame(welcome_frame, style='Panel.TFrame')
-        upload_card.pack(pady=30, ipadx=20, ipady=20)
+        upload_card.pack(pady=30, ipadx=30, ipady=20)
+        self.widget_dict['frame'].append(upload_card)
 
         ttk.Label(upload_card,
                   text="📁",
-                  font=('Segoe UI', 48)).pack(pady=10)
+                  font=('Segoe UI', 64),
+                  foreground=self.accent_color).pack(pady=10)
 
-        ttk.Label(upload_card,
-                  text="Upload Data",
-                  font=('Segoe UI', 16, 'bold')).pack()
+        upload_title = ttk.Label(upload_card,
+                                 text="Upload Network Data",
+                                 font=('Segoe UI', 18, 'bold'))
+        upload_title.pack()
+        self.widget_dict['label'].append(upload_title)
 
-        ttk.Label(upload_card,
-                  text="Supports: CSV, PCAP, NetFlow",
-                  font=('Segoe UI', 11),
-                  foreground='#6c757d').pack(pady=5)
+        upload_desc = ttk.Label(upload_card,
+                                text="Supports: CSV, PCAP files\nDrag & drop or click to browse",
+                                font=('Segoe UI', 11),
+                                foreground=self._lighten_color(self.text_color, -20))
+        upload_desc.pack(pady=10)
+        self.widget_dict['label'].append(upload_desc)
 
         upload_inner_btn = ttk.Button(upload_card,
-                                      text="Select File",
+                                      text="Browse Files",
                                       command=self.upload_data,
                                       style='Accent.TButton')
-        upload_inner_btn.pack(pady=15, ipadx=20, ipady=5)
+        upload_inner_btn.pack(pady=15, ipadx=20, ipady=8)
+        self.widget_dict['button'].append(upload_inner_btn)
 
-        # Features list
+        # Features grid
         features_frame = ttk.Frame(welcome_frame)
         features_frame.pack(pady=30)
+        self.widget_dict['frame'].append(features_frame)
 
         features = [
-            "✓ Time-series analysis of network traffic",
-            "✓ Multi-algorithm anomaly detection",
-            "✓ Protocol-specific anomaly analysis",
-            "✓ ARP spoofing/malicious activity detection",
-            "✓ Interactive visualizations",
-            "✓ Exportable reports"
+            ("🤖", "Machine Learning", "5+ anomaly detection algorithms"),
+            ("📊", "Visual Analytics", "Multiple visualization views"),
+            ("🌗", "Dark/Light Mode", "Customizable interface"),
+            ("📋", "Smart Reports", "Automated report generation"),
+            ("🔒", "Security Focused", "Real-time threat detection"),
+            ("⚡", "Fast Processing", "Optimized for large datasets")
         ]
 
-        for feature in features:
-            ttk.Label(features_frame,
-                      text=feature,
-                      font=('Segoe UI', 11)).pack(anchor='w', pady=2)
+        for icon, title, desc in features:
+            feature_card = ttk.Frame(features_frame, style='Panel.TFrame', width=200, height=120)
+            feature_card.pack(side='left', padx=10, ipadx=10, ipady=10)
+            feature_card.pack_propagate(False)
+            self.widget_dict['frame'].append(feature_card)
+
+            ttk.Label(feature_card,
+                      text=icon,
+                      font=('Segoe UI', 24)).pack(pady=(10, 5))
+
+            ttk.Label(feature_card,
+                      text=title,
+                      font=('Segoe UI', 11, 'bold')).pack()
+
+            ttk.Label(feature_card,
+                      text=desc,
+                      font=('Segoe UI', 9),
+                      wraplength=180,
+                      justify='center').pack(pady=5)
 
     def upload_data(self):
         """Handle file upload"""
@@ -295,7 +457,7 @@ class NetworkAnomalyDashboard:
 
                 # Update UI
                 self.data_info_label.config(
-                    text=f"✓ {len(self.data)} rows, {len(self.data.columns)} features"
+                    text=f"✓ {len(self.data):,} rows, {len(self.data.columns)} features"
                 )
 
                 # Enable analysis buttons
@@ -306,6 +468,10 @@ class NetworkAnomalyDashboard:
                 # Show overview
                 self.switch_view("overview")
                 self.status_label.config(text=f"Loaded: {os.path.basename(filepath)}")
+
+                # Apply theme to new widgets
+                if THEME_MANAGER_AVAILABLE:
+                    self.theme_manager.apply_theme(self.widget_dict)
 
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load file:\n{str(e)}")
@@ -327,13 +493,17 @@ class NetworkAnomalyDashboard:
             widget.destroy()
 
         # Add back button for non-overview views
-        if view_key != "overview":
+        if view_key != "overview" and view_key != "welcome":
             nav_frame = ttk.Frame(self.content_frame)
             nav_frame.pack(fill='x', padx=20, pady=10)
+            self.widget_dict['frame'].append(nav_frame)
 
-            ttk.Button(nav_frame,
-                       text="← Back to Overview",
-                       command=lambda: self.switch_view("overview")).pack(anchor='w')
+            back_btn = ttk.Button(nav_frame,
+                                  text="← Back to Overview",
+                                  command=lambda: self.switch_view("overview"),
+                                  style='TButton')
+            back_btn.pack(anchor='w')
+            self.widget_dict['button'].append(back_btn)
 
         # Show appropriate view
         if view_key == "overview":
@@ -353,6 +523,10 @@ class NetworkAnomalyDashboard:
         elif view_key == "detailed":
             self.show_detailed_view()
 
+        # Apply theme to new widgets
+        if THEME_MANAGER_AVAILABLE:
+            self.theme_manager.apply_theme(self.widget_dict)
+
     def show_overview(self):
         """Show data overview dashboard"""
         if self.data is None:
@@ -361,98 +535,150 @@ class NetworkAnomalyDashboard:
         # Create notebook for multiple overview tabs
         notebook = ttk.Notebook(self.content_frame)
         notebook.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['frame'].append(notebook)
 
         # Tab 1: Quick Stats
         stats_frame = ttk.Frame(notebook)
-        notebook.add(stats_frame, text="📋 Quick Stats")
+        notebook.add(stats_frame, text="📊 Quick Stats")
+        self.widget_dict['frame'].append(stats_frame)
 
         # Calculate statistics
         stats_text = self.get_data_statistics()
-        stats_display = scrolledtext.ScrolledText(stats_frame, height=20)
+        stats_display = scrolledtext.ScrolledText(stats_frame, height=20,
+                                                  bg=self.panel_color,
+                                                  fg=self.text_color,
+                                                  insertbackground=self.text_color)
         stats_display.insert('1.0', stats_text)
         stats_display.configure(state='disabled')
         stats_display.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['text'].append(stats_display)
 
         # Tab 2: Data Preview
         preview_frame = ttk.Frame(notebook)
-        notebook.add(preview_frame, text="👀 Data Preview")
+        notebook.add(preview_frame, text="👁️ Data Preview")
+        self.widget_dict['frame'].append(preview_frame)
 
         # Show first few rows
-        preview_text = scrolledtext.ScrolledText(preview_frame, height=20)
+        preview_text = scrolledtext.ScrolledText(preview_frame, height=20,
+                                                 bg=self.panel_color,
+                                                 fg=self.text_color,
+                                                 insertbackground=self.text_color)
         preview_text.insert('1.0', str(self.data.head(20)))
         preview_text.configure(state='disabled')
         preview_text.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['text'].append(preview_text)
 
         # Tab 3: Column Info
         columns_frame = ttk.Frame(notebook)
-        notebook.add(columns_frame, text="🔠 Columns")
+        notebook.add(columns_frame, text="📋 Column Info")
+        self.widget_dict['frame'].append(columns_frame)
 
-        columns_text = scrolledtext.ScrolledText(columns_frame, height=20)
+        columns_text = scrolledtext.ScrolledText(columns_frame, height=20,
+                                                 bg=self.panel_color,
+                                                 fg=self.text_color,
+                                                 insertbackground=self.text_color)
         col_info = "\n".join([f"{col}: {str(dtype)}"
                               for col, dtype in self.data.dtypes.items()])
         columns_text.insert('1.0', col_info)
         columns_text.configure(state='disabled')
         columns_text.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['text'].append(columns_text)
 
-        # Quick visualization
+        # Static visualization
         if len(self.data.columns) >= 2:
             viz_frame = ttk.Frame(self.content_frame)
             viz_frame.pack(fill='both', expand=True, padx=10, pady=10)
+            self.widget_dict['frame'].append(viz_frame)
 
             try:
+                # Apply matplotlib theme
+                if THEME_MANAGER_AVAILABLE:
+                    plot_style = self.theme_manager.get_plot_style()
+                    plt.rcParams.update(plot_style)
+
                 fig = Figure(figsize=(10, 4))
                 ax = fig.add_subplot(111)
+
+                # Apply theme to figure
+                if self.current_theme == "dark":
+                    fig.patch.set_facecolor('#1e293b')
+                    ax.set_facecolor('#1e293b')
+                    ax.spines['bottom'].set_color('#475569')
+                    ax.spines['top'].set_color('#475569')
+                    ax.spines['right'].set_color('#475569')
+                    ax.spines['left'].set_color('#475569')
+                    ax.tick_params(colors='#e5e7eb')
+                    ax.xaxis.label.set_color('#e5e7eb')
+                    ax.yaxis.label.set_color('#e5e7eb')
+                    ax.title.set_color('#e5e7eb')
+                else:
+                    fig.patch.set_facecolor('#ffffff')
+                    ax.set_facecolor('#ffffff')
 
                 # Plot first numeric column
                 numeric_cols = self.data.select_dtypes(include=[np.number]).columns
                 if len(numeric_cols) > 0:
-                    self.data[numeric_cols[0]].plot(kind='line', ax=ax)
-                    ax.set_title(f"Trend: {numeric_cols[0]}")
-                    ax.grid(True, alpha=0.3)
+                    self.data[numeric_cols[0]].plot(kind='line', ax=ax,
+                                                    color=self.accent_color,
+                                                    linewidth=2)
+                    ax.set_title(f"Trend: {numeric_cols[0]}", fontsize=12, pad=10)
+                    ax.grid(True, alpha=0.3, color=self.border_color)
+                    ax.set_xlabel("Index")
+                    ax.set_ylabel(numeric_cols[0])
 
-                    canvas = FigureCanvasTkAgg(fig, viz_frame)
-                    canvas.draw()
-                    canvas.get_tk_widget().pack(fill='both', expand=True)
-            except:
-                pass
+                canvas = FigureCanvasTkAgg(fig, viz_frame)
+                canvas.draw()
+                canvas.get_tk_widget().pack(fill='both', expand=True)
+                self.widget_dict['canvas'].append(canvas)
+
+                # Add toolbar
+                toolbar = NavigationToolbar2Tk(canvas, viz_frame)
+                toolbar.update()
+                self.widget_dict['frame'].append(toolbar)
+
+            except Exception as e:
+                print(f"Error creating plot: {e}")
 
     def get_data_statistics(self):
         """Generate statistics text for overview"""
         stats = []
         stats.append("=" * 50)
-        stats.append("DATA OVERVIEW")
+        stats.append("📊 DATA OVERVIEW")
         stats.append("=" * 50)
-        stats.append(f"Total Rows: {len(self.data):,}")
-        stats.append(f"Total Columns: {len(self.data.columns)}")
-        stats.append(f"Memory Usage: {self.data.memory_usage(deep=True).sum() / 1024:.1f} KB")
+        stats.append(f"📅 Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        stats.append(f"📁 Total Rows: {len(self.data):,}")
+        stats.append(f"📊 Total Columns: {len(self.data.columns)}")
+        stats.append(f"💾 Memory Usage: {self.data.memory_usage(deep=True).sum() / 1024:.1f} KB")
         stats.append("")
 
-        stats.append("COLUMN TYPES:")
+        stats.append("🔤 COLUMN TYPES:")
         stats.append("-" * 30)
-        for dtype in self.data.dtypes.unique():
-            count = (self.data.dtypes == dtype).sum()
-            stats.append(f"{dtype}: {count} columns")
+        type_counts = self.data.dtypes.value_counts()
+        for dtype, count in type_counts.items():
+            stats.append(f"  {dtype}: {count} columns")
         stats.append("")
 
-        stats.append("MISSING VALUES:")
+        stats.append("⚠️ MISSING VALUES:")
         stats.append("-" * 30)
         missing = self.data.isnull().sum()
-        for col, count in missing[missing > 0].items():
-            stats.append(f"{col}: {count} ({count / len(self.data) * 100:.1f}%)")
-
-        if missing.sum() == 0:
-            stats.append("No missing values found")
+        missing_cols = missing[missing > 0]
+        if len(missing_cols) > 0:
+            for col, count in missing_cols.items():
+                percentage = (count / len(self.data)) * 100
+                stats.append(f"  {col}: {count:,} ({percentage:.1f}%)")
+        else:
+            stats.append("  ✅ No missing values found")
         stats.append("")
 
-        stats.append("NUMERIC STATISTICS:")
+        stats.append("📈 NUMERIC STATISTICS:")
         stats.append("-" * 30)
         numeric_cols = self.data.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols[:5]:  # Limit to first 5
-            stats.append(f"{col}:")
-            stats.append(f"  Mean: {self.data[col].mean():.2f}")
-            stats.append(f"  Std: {self.data[col].std():.2f}")
-            stats.append(f"  Min: {self.data[col].min():.2f}")
-            stats.append(f"  Max: {self.data[col].max():.2f}")
+        for col in numeric_cols[:3]:  # Limit to first 3
+            stats.append(f"  {col}:")
+            stats.append(f"    Mean: {self.data[col].mean():.2f}")
+            stats.append(f"    Std: {self.data[col].std():.2f}")
+            stats.append(f"    Min: {self.data[col].min():.2f}")
+            stats.append(f"    Max: {self.data[col].max():.2f}")
             stats.append("")
 
         return "\n".join(stats)
@@ -462,32 +688,75 @@ class NetworkAnomalyDashboard:
         if self.data is None:
             return
 
-        # Create visualization
-        fig = create_time_series_plot(self.data)
+        viz_frame = ttk.Frame(self.content_frame)
+        viz_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['frame'].append(viz_frame)
 
-        # Embed in tkinter
-        canvas = FigureCanvasTkAgg(fig, self.content_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill='both', expand=True, padx=10, pady=10)
+        try:
+            # Apply matplotlib theme
+            if THEME_MANAGER_AVAILABLE:
+                plot_style = self.theme_manager.get_plot_style()
+                plt.rcParams.update(plot_style)
 
-        # Add toolbar
-        toolbar = NavigationToolbar2Tk(canvas, self.content_frame)
-        toolbar.update()
-        canvas.get_tk_widget().pack(fill='both', expand=True)
+            # Create static plot
+            fig = create_time_series_plot(self.data)
+
+            # Apply theme to figure
+            if self.current_theme == "dark":
+                fig.patch.set_facecolor('#1e293b')
+                for ax in fig.axes:
+                    ax.set_facecolor('#1e293b')
+
+            canvas = FigureCanvasTkAgg(fig, viz_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill='both', expand=True)
+            self.widget_dict['canvas'].append(canvas)
+
+            # Add toolbar
+            toolbar = NavigationToolbar2Tk(canvas, viz_frame)
+            toolbar.update()
+            self.widget_dict['frame'].append(toolbar)
+
+        except Exception as e:
+            error_label = ttk.Label(viz_frame,
+                                    text=f"Error creating time series plot:\n{str(e)}",
+                                    font=('Segoe UI', 12))
+            error_label.pack(pady=50)
+            self.widget_dict['label'].append(error_label)
 
     def show_distributions(self):
         """Show distribution plots"""
         if self.data is None:
             return
 
-        fig = create_distribution_plot(self.data)
+        viz_frame = ttk.Frame(self.content_frame)
+        viz_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['frame'].append(viz_frame)
 
-        canvas = FigureCanvasTkAgg(fig, self.content_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill='both', expand=True, padx=10, pady=10)
+        try:
+            fig = create_distribution_plot(self.data)
 
-        toolbar = NavigationToolbar2Tk(canvas, self.content_frame)
-        toolbar.update()
+            # Apply theme to figure
+            if self.current_theme == "dark":
+                fig.patch.set_facecolor('#1e293b')
+                for ax in fig.axes:
+                    ax.set_facecolor('#1e293b')
+
+            canvas = FigureCanvasTkAgg(fig, viz_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill='both', expand=True)
+            self.widget_dict['canvas'].append(canvas)
+
+            toolbar = NavigationToolbar2Tk(canvas, viz_frame)
+            toolbar.update()
+            self.widget_dict['frame'].append(toolbar)
+
+        except Exception as e:
+            error_label = ttk.Label(viz_frame,
+                                    text=f"Error creating distribution plot:\n{str(e)}",
+                                    font=('Segoe UI', 12))
+            error_label.pack(pady=50)
+            self.widget_dict['label'].append(error_label)
 
     def run_anomaly_detection(self):
         """Run anomaly detection on loaded data"""
@@ -518,7 +787,8 @@ class NetworkAnomalyDashboard:
             messagebox.showinfo(
                 "Detection Complete",
                 f"Found {anomaly_count} anomalies ({anomaly_count / len(self.data) * 100:.1f}%)\n"
-                f"Model: {self.model_var.get()}"
+                f"Model: {self.model_var.get()}\n\n"
+                f"View results in the 'Anomaly Detection' tab!"
             )
 
         except Exception as e:
@@ -529,27 +799,61 @@ class NetworkAnomalyDashboard:
         """Show anomaly detection results"""
         if self.anomaly_results is None:
             # Show instruction
-            ttk.Label(self.content_frame,
-                      text="Run anomaly detection first to see results",
-                      font=('Segoe UI', 14)).pack(pady=50)
+            instruct_label = ttk.Label(self.content_frame,
+                                       text="Run anomaly detection first to see results\n\n"
+                                            "Click '🚨 Detect Anomalies' in the sidebar",
+                                       font=('Segoe UI', 14),
+                                       justify='center')
+            instruct_label.pack(pady=50)
+            self.widget_dict['label'].append(instruct_label)
             return
 
         # Create notebook for anomaly views
         notebook = ttk.Notebook(self.content_frame)
         notebook.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['frame'].append(notebook)
 
         # Tab 1: Scatter plot
         scatter_frame = ttk.Frame(notebook)
-        notebook.add(scatter_frame, text="Scatter Plot")
+        notebook.add(scatter_frame, text="🎯 Scatter Plot")
+        self.widget_dict['frame'].append(scatter_frame)
 
-        fig = create_anomaly_scatter(self.anomaly_results)
-        canvas = FigureCanvasTkAgg(fig, scatter_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill='both', expand=True)
+        # Plot frame
+        scatter_plot_frame = ttk.Frame(scatter_frame)
+        scatter_plot_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['frame'].append(scatter_plot_frame)
+
+        try:
+            # Create static scatter plot
+            fig = create_anomaly_scatter(self.anomaly_results)
+
+            # Apply theme
+            if self.current_theme == "dark":
+                fig.patch.set_facecolor('#1e293b')
+                for ax in fig.axes:
+                    ax.set_facecolor('#1e293b')
+
+            canvas = FigureCanvasTkAgg(fig, scatter_plot_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill='both', expand=True)
+            self.widget_dict['canvas'].append(canvas)
+
+            # Add toolbar
+            toolbar = NavigationToolbar2Tk(canvas, scatter_plot_frame)
+            toolbar.update()
+            self.widget_dict['frame'].append(toolbar)
+
+        except Exception as e:
+            error_label = ttk.Label(scatter_plot_frame,
+                                    text=f"Error creating scatter plot:\n{str(e)}",
+                                    font=('Segoe UI', 12))
+            error_label.pack(pady=50)
+            self.widget_dict['label'].append(error_label)
 
         # Tab 2: Anomaly list
         list_frame = ttk.Frame(notebook)
-        notebook.add(list_frame, text="Anomaly List")
+        notebook.add(list_frame, text="📋 Anomaly List")
+        self.widget_dict['frame'].append(list_frame)
 
         # Get anomalies
         anomalies = self.anomaly_results[self.anomaly_results.get('anomaly', 0) == 1]
@@ -557,79 +861,142 @@ class NetworkAnomalyDashboard:
         # Create treeview
         tree_frame = ttk.Frame(list_frame)
         tree_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['frame'].append(tree_frame)
 
         tree_scroll = ttk.Scrollbar(tree_frame)
         tree_scroll.pack(side='right', fill='y')
 
         tree = ttk.Treeview(tree_frame,
                             yscrollcommand=tree_scroll.set,
-                            selectmode='extended')
+                            selectmode='extended',
+                            height=20)
         tree_scroll.config(command=tree.yview)
 
         # Define columns
-        columns = list(anomalies.columns[:10])  # First 10 columns
+        columns = list(anomalies.columns[:8])  # First 8 columns
         tree['columns'] = columns
 
         # Format columns
         tree.column("#0", width=0, stretch=False)
         for col in columns:
-            tree.column(col, anchor='w', width=100)
+            tree.column(col, anchor='w', width=120)
             tree.heading(col, text=col, anchor='w')
 
         # Add data
         for idx, row in anomalies.head(100).iterrows():  # Limit to 100 rows
-            values = [str(row[col])[:50] for col in columns]  # Truncate long values
+            values = [str(row[col])[:40] for col in columns]
             tree.insert(parent='', index='end', values=values)
 
         tree.pack(fill='both', expand=True)
+
+        # Add count label
+        count_label = ttk.Label(list_frame,
+                                text=f"Showing {min(100, len(anomalies))} of {len(anomalies)} anomalies",
+                                font=('Segoe UI', 9))
+        count_label.pack(side='bottom', pady=5)
+        self.widget_dict['label'].append(count_label)
 
     def show_protocol_analysis(self):
         """Show protocol-specific analysis"""
         if self.data is None:
             return
 
-        fig = create_protocol_analysis(self.data)
+        viz_frame = ttk.Frame(self.content_frame)
+        viz_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['frame'].append(viz_frame)
 
-        canvas = FigureCanvasTkAgg(fig, self.content_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill='both', expand=True, padx=10, pady=10)
+        try:
+            fig = create_protocol_analysis(self.data)
 
-        toolbar = NavigationToolbar2Tk(canvas, self.content_frame)
-        toolbar.update()
+            # Apply theme
+            if self.current_theme == "dark":
+                fig.patch.set_facecolor('#1e293b')
+                for ax in fig.axes:
+                    ax.set_facecolor('#1e293b')
+
+            canvas = FigureCanvasTkAgg(fig, viz_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill='both', expand=True)
+            self.widget_dict['canvas'].append(canvas)
+
+            toolbar = NavigationToolbar2Tk(canvas, viz_frame)
+            toolbar.update()
+            self.widget_dict['frame'].append(toolbar)
+
+        except Exception as e:
+            error_label = ttk.Label(viz_frame,
+                                    text=f"Error creating protocol analysis:\n{str(e)}",
+                                    font=('Segoe UI', 12))
+            error_label.pack(pady=50)
+            self.widget_dict['label'].append(error_label)
 
     def show_arp_analysis(self):
         """Show ARP-specific analysis"""
         if self.data is None:
             return
 
+        viz_frame = ttk.Frame(self.content_frame)
+        viz_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['frame'].append(viz_frame)
+
         try:
             fig = create_arp_analysis(self.data)
 
-            canvas = FigureCanvasTkAgg(fig, self.content_frame)
-            canvas.draw()
-            canvas.get_tk_widget().pack(fill='both', expand=True, padx=10, pady=10)
+            # Apply theme
+            if self.current_theme == "dark":
+                fig.patch.set_facecolor('#1e293b')
+                for ax in fig.axes:
+                    ax.set_facecolor('#1e293b')
 
-            toolbar = NavigationToolbar2Tk(canvas, self.content_frame)
+            canvas = FigureCanvasTkAgg(fig, viz_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill='both', expand=True)
+            self.widget_dict['canvas'].append(canvas)
+
+            toolbar = NavigationToolbar2Tk(canvas, viz_frame)
             toolbar.update()
+            self.widget_dict['frame'].append(toolbar)
 
         except Exception as e:
-            ttk.Label(self.content_frame,
-                      text=f"ARP analysis requires specific columns\nError: {str(e)}",
-                      font=('Segoe UI', 12)).pack(pady=50)
+            error_label = ttk.Label(viz_frame,
+                                    text=f"ARP analysis requires specific columns\nError: {str(e)}",
+                                    font=('Segoe UI', 12))
+            error_label.pack(pady=50)
+            self.widget_dict['label'].append(error_label)
 
     def show_heatmap(self):
         """Show correlation heatmap"""
         if self.data is None:
             return
 
-        fig = create_heatmap(self.data)
+        viz_frame = ttk.Frame(self.content_frame)
+        viz_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        self.widget_dict['frame'].append(viz_frame)
 
-        canvas = FigureCanvasTkAgg(fig, self.content_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill='both', expand=True, padx=10, pady=10)
+        try:
+            fig = create_heatmap(self.data)
 
-        toolbar = NavigationToolbar2Tk(canvas, self.content_frame)
-        toolbar.update()
+            # Apply theme
+            if self.current_theme == "dark":
+                fig.patch.set_facecolor('#1e293b')
+                for ax in fig.axes:
+                    ax.set_facecolor('#1e293b')
+
+            canvas = FigureCanvasTkAgg(fig, viz_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill='both', expand=True)
+            self.widget_dict['canvas'].append(canvas)
+
+            toolbar = NavigationToolbar2Tk(canvas, viz_frame)
+            toolbar.update()
+            self.widget_dict['frame'].append(toolbar)
+
+        except Exception as e:
+            error_label = ttk.Label(viz_frame,
+                                    text=f"Error creating heatmap:\n{str(e)}",
+                                    font=('Segoe UI', 12))
+            error_label.pack(pady=50)
+            self.widget_dict['label'].append(error_label)
 
     def show_detailed_view(self):
         """Show detailed data view"""
@@ -639,43 +1006,24 @@ class NetworkAnomalyDashboard:
         # Create searchable/filterable data table
         main_frame = ttk.Frame(self.content_frame)
         main_frame.pack(fill='both', expand=True, padx=10, pady=10)
-
-        # Search bar
-        search_frame = ttk.Frame(main_frame)
-        search_frame.pack(fill='x', pady=(0, 10))
-
-        ttk.Label(search_frame, text="Search:").pack(side='left', padx=(0, 5))
-        search_var = tk.StringVar()
-        search_entry = ttk.Entry(search_frame, textvariable=search_var, width=40)
-        search_entry.pack(side='left')
-
-        # Filter by column
-        filter_frame = ttk.Frame(main_frame)
-        filter_frame.pack(fill='x', pady=(0, 10))
-
-        ttk.Label(filter_frame, text="Filter Column:").pack(side='left', padx=(0, 5))
-        column_var = tk.StringVar(value=self.data.columns[0])
-        column_combo = ttk.Combobox(filter_frame,
-                                    textvariable=column_var,
-                                    values=list(self.data.columns))
-        column_combo.pack(side='left', padx=(0, 10))
-
-        ttk.Label(filter_frame, text="Value:").pack(side='left', padx=(0, 5))
-        value_entry = ttk.Entry(filter_frame, width=20)
-        value_entry.pack(side='left')
+        self.widget_dict['frame'].append(main_frame)
 
         # Data display
-        text_widget = scrolledtext.ScrolledText(main_frame, height=30)
+        text_widget = scrolledtext.ScrolledText(main_frame, height=30,
+                                                bg=self.panel_color,
+                                                fg=self.text_color,
+                                                insertbackground=self.text_color)
         text_widget.pack(fill='both', expand=True)
+        self.widget_dict['text'].append(text_widget)
 
         # Show all data (truncated if large)
         if len(self.data) > 1000:
             display_data = self.data.head(1000)
             text_widget.insert('1.0',
-                               f"Showing first 1000 of {len(self.data)} rows\n\n")
+                               f"Showing first 1000 of {len(self.data):,} rows\n\n")
             text_widget.insert('end', str(display_data))
             text_widget.insert('end',
-                               f"\n\n... and {len(self.data) - 1000} more rows")
+                               f"\n\n... and {len(self.data) - 1000:,} more rows")
         else:
             text_widget.insert('1.0', str(self.data))
 
@@ -687,22 +1035,55 @@ class NetworkAnomalyDashboard:
             return
 
         try:
-            report = generate_report(self.data, self.anomaly_results)
+            if REPORT_GEN_AVAILABLE:
+                # Use enhanced report generator
+                generator = ReportGenerator()
+                report = generator.generate_comprehensive_report(
+                    data=self.data,
+                    anomaly_results=self.anomaly_results,
+                    analysis_type="full"
+                )
 
-            # Save dialog
-            filename = filedialog.asksaveasfilename(
-                defaultextension=".txt",
-                filetypes=[
-                    ("Text files", "*.txt"),
-                    ("Markdown files", "*.md"),
-                    ("All files", "*.*")
-                ]
-            )
+                # Ask for report type
+                report_type = messagebox.askquestion("Report Type",
+                                                     "Generate HTML report?\n\n"
+                                                     "Yes: HTML format (view in browser)\n"
+                                                     "No: Text format (view in any editor)")
+
+                if report_type == 'yes':
+                    # Generate HTML report
+                    html_report = generator.generate_html_report(report)
+                    filename = filedialog.asksaveasfilename(
+                        defaultextension=".html",
+                        filetypes=[("HTML files", "*.html"),
+                                   ("All files", "*.*")]
+                    )
+                    if filename:
+                        with open(filename, 'w', encoding='utf-8') as f:
+                            f.write(html_report)
+                else:
+                    # Generate text report
+                    filename = filedialog.asksaveasfilename(
+                        defaultextension=".txt",
+                        filetypes=[("Text files", "*.txt"),
+                                   ("Markdown files", "*.md"),
+                                   ("All files", "*.*")]
+                    )
+                    if filename:
+                        generator.export_report(report, filename)
+            else:
+                # Fallback to simple report
+                report = self.generate_simple_report()
+                filename = filedialog.asksaveasfilename(
+                    defaultextension=".txt",
+                    filetypes=[("Text files", "*.txt"),
+                               ("All files", "*.*")]
+                )
+                if filename:
+                    with open(filename, 'w') as f:
+                        f.write(report)
 
             if filename:
-                with open(filename, 'w') as f:
-                    f.write(report)
-
                 messagebox.showinfo(
                     "Success",
                     f"Report saved to:\n{filename}"
@@ -712,10 +1093,48 @@ class NetworkAnomalyDashboard:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to export report:\n{str(e)}")
 
+    def generate_simple_report(self):
+        """Generate a simple report as fallback"""
+        report = []
+        report.append("=" * 60)
+        report.append("NETWORK ANALYSIS REPORT")
+        report.append("=" * 60)
+        report.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        report.append(f"Data Points: {len(self.data):,}")
+        report.append(f"Features: {len(self.data.columns)}")
+        report.append("")
+
+        if self.anomaly_results is not None:
+            anomaly_count = (self.anomaly_results.get('anomaly', 0) == 1).sum()
+            report.append(f"Anomalies Detected: {anomaly_count:,}")
+            report.append(f"Anomaly Rate: {anomaly_count / len(self.data) * 100:.1f}%")
+            report.append(f"Detection Model: {self.model_var.get()}")
+
+        report.append("")
+        report.append("Report generated by Network Anomaly Detection System")
+
+        return "\n".join(report)
+
+    def on_closing(self):
+        """Handle window closing"""
+        self.root.destroy()
+
 
 def main():
     root = tk.Tk()
     app = NetworkAnomalyDashboard(root)
+
+    # Handle window closing
+    root.protocol("WM_DELETE_WINDOW", app.on_closing)
+
+    # Center window on screen
+    root.update_idletasks()
+    width = root.winfo_width()
+    height = root.winfo_height()
+    x = (root.winfo_screenwidth() // 2) - (width // 2)
+    y = (root.winfo_screenheight() // 2) - (height // 2)
+    root.geometry(f'{width}x{height}+{x}+{y}')
+
     root.mainloop()
 
 

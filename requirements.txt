@@ -1,29 +1,5 @@
-# Core requirements
-pandas
-numpy
-scikit-learn
-matplotlib
-seaborn
-
-# Dashboard
-tkinter  # Usually comes with Python
-
-# Enhanced features
-python-docx
-fpdf
-pyautogui
-
-# Optional for advanced features
-tensorflow
-keras
-streamlit
-plotly
-
-# Development
-jupyter
-ipykernel
-black
-
-# Optional for advanced features
-tensorflow>=2.10.0  # For autoencoder (uncomment if needed)
-scapy>=2.5.0       # For PCAP file support (uncomment if needed)
+pandas>=1.5.0
+numpy>=1.23.0
+scikit-learn>=1.2.0
+matplotlib>=3.6.0
+seaborn>=0.12.0
