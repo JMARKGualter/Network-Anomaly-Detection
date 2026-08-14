@@ -1,73 +1,97 @@
-## 📊 Network Anomaly Detection System ##
+# 📊 Network Anomaly Detection System
 
-### Purpose ###
-####   Network Anomaly Detection System is a powerful, Python-based application designed to identify suspicious activities and potential security threats in network traffic data. Whether you're a network administrator, security analyst, or student learning about cybersecurity, this tool provides an intuitive interface to analyze network patterns and detect anomalies using machine learning algorithms. Its a personal project that intent to express my learning in data analysis and networking. ####
+## Purpose
 
-### What it does? ###
+A Python-based application designed to identify suspicious activities and potential security threats in network traffic data. Built as a personal project to demonstrate practical learning in **data analysis, cybersecurity, and networking**.
 
-#### 
-- Automatically detects unusual network behavior that could indicate security threats
-- Analyzes network traffic patterns from CSV or PCAP files
-- Visualizes data through multiple analytical views
-- Generates professional reports with actionable insight
-- Supports both dark and light mode for comfortable usage
-####
+---
 
-### Limitations ###
+## What It Does
 
-#### As being said, This is made to express what I've learn in data analyst and networking. It also limitations since it is a small personal project. For its technical limits, file size (100 mb for csv and 50MB for PCAP). The system provides full support for TCP, UDP, and ICMP protocols. However, it offers limited analysis capabilities for encrypted traffic due to inherent constraints in inspecting encrypted payloads.For processing PCAP files, the system requires installation of the Scapy library. This dependency enables comprehensive packet analysis from captured network traffic files. Several detection limitations should be noted. False positives may occur where normal traffic patterns are flagged as anomalous in certain edge cases or unusual network configurations. Additionally, the system may not detect completely novel attack patterns without prior training or pattern recognition. Encrypted traffic presents another constraint, offering limited insight into packet contents due to encryption. Furthermore, the system lacks organizational context awareness and does not incorporate specific network policies that might influence threat assessment. The system supports Windows, Mac, and Linux platforms with Python 3.8 or higher. Minimum specifications include 4GB of RAM and 2GB of free disk space. For optimal performance, especially when working with larger datasets, 8GB or more of RAM is recommended to ensure efficient processing and analysis. ####
+* Automatically detects unusual network behavior that could indicate security threats
+* Analyzes network traffic patterns from **CSV** or **PCAP** files
+* Visualizes network data through multiple analytical views
+* Generates professional reports with actionable insights
 
-### How it work? ###
+---
 
-#### 1. Upload your network data (CSV or PCAP format)
-#### First thing that will see 
+## Limitations
 
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/a78c67b6-9fb1-4201-ab3a-e6bfdfe9fce4" />
+* **File Size Limits:** CSV files up to 100 MB; PCAP files up to 50 MB
+* **Protocol Support:** TCP, UDP, and ICMP are fully supported; encrypted traffic has limited visibility
+* **Detection:** May produce false positives and may not detect previously unknown attacks
+* **System Requirements:** Python 3.8+, 4 GB RAM minimum (8 GB recommended), and 2 GB available disk space
+* **PCAP Analysis:** Requires the Scapy library
+* **Context Awareness:** Does not account for organization-specific security policies or network configurations
 
-#### After uploading csv/PCAP
-#### Overview with 3 tabs(Quick stats, Data Preview, Column Info)
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/a74f3116-51cc-4dbd-92cd-532857382a6c" />
+---
 
-#### Time Series
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/76b0850f-9650-440c-a3dc-203bf93b9da8" />
+## How It Works
 
-#### Distributions
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/ccc85eb9-7bd7-4f7c-a5f3-28a00e073d08" />
+### 1. Upload Network Data
 
-##### The user have a free will what size of graph they want, its orientation and save the graph.
+Upload your network traffic data in **CSV** or **PCAP** format.
 
-#### For anomaly detection, you need to click the red button first for analyzing anomaly
-##### There are choices for anomaly detection 
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/c7666921-43c8-4193-b61d-20fd592e5365" />
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/754e940c-6d97-4847-83cb-0ee12b2ae64a" />
 
-#### Protocols
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/41d8784d-5dd0-490f-8533-30f7fc9fa943" />
 
-#### ARP Analysis
+*The landing page where users upload their network data files.*
 
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/e488b987-c63b-4def-abcb-b9a1a0796cd6" />
+---
 
-#### Heatmap
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/382a8167-e18b-4444-9895-d7357102076d" />
+### 2. Analyze Data Through the Dashboard
 
-#### Details
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/00bce63e-8f56-493a-acd8-ba601262a5dc" />
+The system provides multiple analytical views for examining network traffic and identifying potential anomalies.
 
-##### As you can see there is option for generating report and save as html file.
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/4f01c84e-10b5-4da4-8ff3-a0b8c3c22b08" />
 
 
 
-<img width="1091" height="879" alt="image" src="https://github.com/user-attachments/assets/c4eaa723-849c-487f-884b-7091773d06f3" />
-<img width="752" height="777" alt="image" src="https://github.com/user-attachments/assets/2afac785-f1be-43ad-b0ea-3686c1f2ed9c" />
+*The main dashboard provides overview, time series, distributions, anomaly detection, protocol analysis, ARP analysis, heatmap, and detailed network traffic views.*
+
+---
+
+### 3. Generate Reports
+
+Generate professional reports containing analysis results and actionable insights. Reports can be saved as **HTML files** for further review or documentation.
+
+<img width="972" height="740" alt="image" src="https://github.com/user-attachments/assets/def9e6bb-1c3f-46fe-9197-eb930b926e2d" />
 
 
+*The report generation interface provides interpretations and insights based on the analyzed network traffic.*
 
-##### Disclaimer: The data that I used is data from wireshark.
+---
 
+## Quick Install
 
+Install the required Python dependencies:
 
+```bash
+pip install pandas numpy scikit-learn matplotlib seaborn scapy
+```
 
+## Run
 
+Start the application with:
 
+```bash
+python dashboard.py
+```
 
+---
 
+## Technologies Used
+
+* **Python**
+* **Pandas**
+* **NumPy**
+* **Scikit-learn**
+* **Matplotlib**
+* **Seaborn**
+* **Scapy**
+
+---
+
+## Disclaimer
+
+The network traffic data used in this project was obtained from **Wireshark captures** and is intended for educational and research purposes.
